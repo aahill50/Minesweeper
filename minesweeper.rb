@@ -49,11 +49,19 @@ class Minesweeper
       until coords.length == 2
         puts "Choose coordinates: x,y"
         coords = gets.chomp.split(",").map(&:to_i)
+        puts
       end
 
       tile = board.tiles[coords[0]][coords[1]]
       if tile.status == :bomb && choice == 'r'
         puts "You lose!"
+        end_time = Time.now
+        elapsed_time = end_time - board.start_time
+        board.reveal_bomb(tile)
+        board.draw
+        puts "It took you #{elapsed_time} seconds"
+        puts
+        puts "BOOOMMMMMM!!!!!!!!!!!"
         return nil
       elsif tile.status == :revealed
         puts "Tile already revealed!"
@@ -61,24 +69,28 @@ class Minesweeper
         puts "Tile is flagged!"
       elsif tile.flagged && choice == 'f'
         puts "Unflagging tile!"
-        tile.flagged = false
+        board.unflag(tile)
       elsif tile.status != :revealed && choice == 'f'
         board.flag(tile)
       else
         board.reveal(tile)
       end
     end
+    end_time = Time.now
+    elapsed_time = end_time - board.start_time
     board.draw
     puts "YOU WON!!!!!!!!!!!!"
+    puts "It took you #{elapsed_time} seconds"
   end
 end
 
 class Board
-  attr_reader :bomb_locations, :tiles
+  attr_reader :bomb_locations, :tiles, :start_time
 
   def initialize(dimensions = [9,9],bomb_number = 1)
     @dimensions = dimensions
     @bomb_number = bomb_number
+    @start_time = Time.now
     board_set_up
     tile_set_up
   end
@@ -170,6 +182,15 @@ class Board
   def flag(tile)
     tile.flagged = true
     @rows[tile.location[0]][tile.location[1]] = "f"
+  end
+
+  def unflag(tile)
+    tile.flagged = false
+    @rows[tile.location[0]][tile.location[1]] = "*"
+  end
+
+  def reveal_bomb(tile)
+    @rows[tile.location[0]][tile.location[1]] = "B"
   end
 
   def draw
