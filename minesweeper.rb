@@ -1,16 +1,32 @@
 require 'yaml'
 
 class Minesweeper
+
+  def initialize
+    play
+  end
+
   def play
-    puts "Choose board dimensions: x,y"
-    dimensions = gets.chomp.split(",").map(&:to_i)
+    puts "Would you like to load a save file? (y/n)"
+    answer = gets.chomp
+    if answer == 'y'
+      puts "What is the filename?"
+      filename = gets.chomp
+      load_file = File.open(filename).read
+      board = YAML::load(load_file)
+    elsif answer == 'n'
 
-    puts
-    print "Choose bomb number: "
-    bomb_numb = Integer(gets.chomp)
-    puts
+      puts "Choose board dimensions: x,y"
+      dimensions = gets.chomp.split(",").map(&:to_i)
 
-    board = Board.new(dimensions, bomb_numb)
+      puts
+      print "Choose bomb number: "
+      bomb_numb = Integer(gets.chomp)
+      puts
+
+      board = Board.new(dimensions, bomb_numb)
+
+    end
 
     until board.over?
       board.draw
@@ -24,6 +40,7 @@ class Minesweeper
       if choice == 's'
         puts "Enter filename to save to"
         filename = gets.chomp
+        File.open(filename,'w') {|file| file.write(board.to_yaml)}
       end
 
 
@@ -36,7 +53,8 @@ class Minesweeper
 
       tile = board.tiles[coords[0]][coords[1]]
       if tile.status == :bomb && choice == 'r'
-        return "You lose!"
+        puts "You lose!"
+        return nil
       elsif tile.status == :revealed
         puts "Tile already revealed!"
       elsif tile.flagged && choice == 'r'
@@ -50,6 +68,7 @@ class Minesweeper
         board.reveal(tile)
       end
     end
+    board.draw
     puts "YOU WON!!!!!!!!!!!!"
   end
 end
@@ -128,7 +147,7 @@ class Board
     tile.status = :revealed
     bomb_count = tile.neighbor_bomb_count
     if bomb_count == 0
-      @rows[tile.location[0]][tile.location[1]] = "_"
+      @rows[tile.location[0]][tile.location[1]] = " "
       tile.neighbors.each do |neighbor|
 
         unless neighbor.status == :revealed || neighbor.status == :bomb
@@ -154,8 +173,15 @@ class Board
   end
 
   def draw
-    puts @rows
-    puts "==========="
+    print "  "
+    (0..@dimensions[0]-1).each {|num| print num % 10}
+    print "  "
+    puts
+    puts "||" + "=" * @dimensions[0] + "||"
+    @rows.each_with_index do |row, index|
+      puts "||#{row}||#{index}"
+    end
+    puts "||" + "=" * @dimensions[0] + "||"
   end
 
 end
