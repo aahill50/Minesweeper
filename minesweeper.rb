@@ -1,17 +1,70 @@
+require 'yaml'
+
 class Minesweeper
   def play
+    puts "Choose board dimensions: x,y"
+    dimensions = gets.chomp.split(",").map(&:to_i)
 
+    puts
+    print "Choose bomb number: "
+    bomb_numb = Integer(gets.chomp)
+    puts
+
+    board = Board.new(dimensions, bomb_numb)
+
+    until board.over?
+      board.draw
+      choice = ""
+      until choice == 'r' || choice == 'f' || choice == 's'
+        puts "Type r to reveal, type f to flag or unflag"
+        puts "Type s to save"
+        choice = gets.chomp
+      end
+
+      if choice == 's'
+        puts "Enter filename to save to"
+        filename = gets.chomp
+      end
+
+
+
+      coords = []
+      until coords.length == 2
+        puts "Choose coordinates: x,y"
+        coords = gets.chomp.split(",").map(&:to_i)
+      end
+
+      tile = board.tiles[coords[0]][coords[1]]
+      if tile.status == :bomb && choice == 'r'
+        return "You lose!"
+      elsif tile.status == :revealed
+        puts "Tile already revealed!"
+      elsif tile.flagged && choice == 'r'
+        puts "Tile is flagged!"
+      elsif tile.flagged && choice == 'f'
+        puts "Unflagging tile!"
+        tile.flagged = false
+      elsif tile.status != :revealed && choice == 'f'
+        board.flag(tile)
+      else
+        board.reveal(tile)
+      end
+    end
+    puts "YOU WON!!!!!!!!!!!!"
   end
 end
 
 class Board
-  def initialize(dimensions = [9,9],bomb_number = 15)
+  attr_reader :bomb_locations, :tiles
+
+  def initialize(dimensions = [9,9],bomb_number = 1)
     @dimensions = dimensions
     @bomb_number = bomb_number
-    set_up
+    board_set_up
+    tile_set_up
   end
 
-  def set_up
+  def board_set_up
     @rows = Array.new(@dimensions[1]) {"*" * @dimensions[0]}
     @bomb_locations = []
 
@@ -21,15 +74,116 @@ class Board
         @bomb_locations << potential_location
       end
     end
+  end
 
-    # @bomb_locations.each do |loc|
-    #   @rows[loc[0]][loc[1 ]] = "b"
-    # end
+  def tile_set_up
+    @tiles = []
 
+    @rows.each_with_index do |row, col_index|
+      @tiles << []
+      row.split("").each_index do |row_index|
+        new_tile = Tile.new([row_index, col_index])
+        if @bomb_locations.include?([row_index, col_index])
+          new_tile.status = :bomb
+        end
+        @tiles.last << new_tile
+
+        y, x = row_index, col_index
+
+        if y-1 >= 0
+          @tiles[x][y].set_neighbor(@tiles[x][y-1])
+          @tiles[x][y-1].set_neighbor(@tiles[x][y])
+          if x-1 >= 0
+            @tiles[x][y].set_neighbor(@tiles[x-1][y-1])
+            @tiles[x-1][y-1].set_neighbor(@tiles[x][y])
+          end
+        end
+        if x-1 >= 0
+          @tiles[x][y].set_neighbor(@tiles[x-1][y])
+          @tiles[x-1][y].set_neighbor(@tiles[x][y])
+          if y+1 < @dimensions[0]
+            @tiles[x][y].set_neighbor(@tiles[x-1][y+1])
+            @tiles[x-1][y+1].set_neighbor(@tiles[x][y])
+          end
+        end
+      end
+    end
+
+    def over?
+      reveal_count = 0
+
+      @tiles.each do |tile_row|
+        tile_row.each do |tile|
+          if tile.status == :revealed
+            reveal_count += 1
+          end
+        end
+      end
+
+      (@dimensions[0] * @dimensions[1]) - @bomb_number == reveal_count
+    end
+  end
+
+  def reveal(tile)
+    tile.status = :revealed
+    bomb_count = tile.neighbor_bomb_count
+    if bomb_count == 0
+      @rows[tile.location[0]][tile.location[1]] = "_"
+      tile.neighbors.each do |neighbor|
+
+        unless neighbor.status == :revealed || neighbor.status == :bomb
+          unless neighbor.flagged
+            bomb_count = neighbor.neighbor_bomb_count
+            if bomb_count == 0
+              reveal(neighbor)
+            elsif bomb_count > 0
+              neighbor.status = :revealed
+              @rows[neighbor.location[0]][neighbor.location[1]] = "#{bomb_count}"
+            end
+          end
+        end
+      end
+    else
+      @rows[tile.location[0]][tile.location[1]] = "#{bomb_count}"
+    end
+  end
+
+  def flag(tile)
+    tile.flagged = true
+    @rows[tile.location[0]][tile.location[1]] = "f"
+  end
+
+  def draw
+    puts @rows
+    puts "==========="
   end
 
 end
 
 class Tile
+  attr_accessor :location, :status, :neighbors, :flagged
 
+  def initialize(location, status = :neutral)
+    @location = location
+    @status = status
+    @neighbors = []
+    @flagged = false
+  end
+
+  def set_neighbor(tile)
+    return nil if tile.nil?
+    @neighbors << tile unless @neighbors.include?(tile)
+  end
+
+  def neighbor_bomb_count
+    bomb_count = 0
+    @neighbors.each do |neighbor|
+      bomb_count += 1 if neighbor.status == :bomb
+    end
+    bomb_count
+  end
+
+  def inspect
+    [@location,"#{@neighbors.count} n"]
+  end
 end
